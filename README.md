@@ -28,12 +28,12 @@ Las cuotas tienen un período `DATE` normalizado al primer día del mes y montos
 1. Instalá PostgreSQL, Python 3.10 o superior y Node.js. Creá **manualmente una base vacía** llamada, por ejemplo, `club_moreno_itunm` desde pgAdmin o PostgreSQL. Elegí vos el usuario, contraseña, host y puerto. No ejecutes el script sobre una base que ya tenga tablas con estos nombres.
 2. Conectate a esa base en pgAdmin y ejecutá completo `database/database_setup.sql` en Query Tool. Alternativamente, con `psql`: `psql -U TU_USUARIO -d club_moreno_itunm -f database/database_setup.sql`. El script no ejecuta `CREATE DATABASE`.
 3. Copiá `.env.example` como `.env` en la raíz y reemplazá `usuario`, `password`, host, puerto y nombre de base por tus valores reales. Si la contraseña tiene caracteres especiales, codificalos para una URL. La variable requerida es `DATABASE_URL`.
-4. En `backend/`, ejecutá `python -m venv .venv`, activá el entorno (`.venv\Scripts\Activate.ps1` en PowerShell, `source .venv/bin/activate` en Linux/macOS), `pip install -r requirements.txt` y `uvicorn main:app --reload`. La API abre en `http://localhost:8000`; documentación en `/docs`.
+4. En `backend/`, ejecutá `python -m venv .venv`, activá el entorno (`.venv\Scripts\Activate.ps1` en PowerShell, `source .venv/bin/activate` en Linux/macOS), `pip install -r requirements.txt` y `uvicorn main:app --reload --port 8001`. La API abre en `http://localhost:8001`; documentación en `/docs`.
 5. En otra terminal, en `frontend/`, ejecutá `npm install` y `npm run dev`. Abrí `http://localhost:5173`. Para compilar: `npm run build`.
 
 En Windows, después de instalar las dependencias, también podés abrir dos terminales en la raíz y ejecutar `start-backend.bat` y `start-frontend.bat`. El primer script usa directamente `backend/.venv/Scripts/python.exe`, por lo que no requiere activar el entorno virtual ni depender de que `python` y `uvicorn` estén en el `PATH`.
 
-El frontend usa `http://localhost:8000` por defecto. Para otra dirección, definí `VITE_API_URL` en `frontend/.env.local`. La API permite CORS desde el servidor Vite local.
+El frontend usa `http://localhost:8001` por defecto. Para otra dirección, definí `VITE_API_URL` en `frontend/.env.local`. La API permite CORS desde el servidor Vite local.
 
 ## API y dashboard
 
