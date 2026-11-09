@@ -1,7 +1,7 @@
 from datetime import date
 from decimal import Decimal
 
-from sqlalchemy import Boolean, Date, ForeignKey, Integer, Numeric, String, Text, UniqueConstraint
+from sqlalchemy import Boolean, CheckConstraint, Date, ForeignKey, Integer, Numeric, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from database import Base
@@ -75,3 +75,13 @@ class Pago(Base):
     monto: Mapped[Decimal] = mapped_column(Numeric(12, 2))
     medio_pago: Mapped[str] = mapped_column(String(20))
     cuota: Mapped[Cuota] = relationship()
+
+
+class Gasto(Base):
+    __tablename__ = 'gastos'
+    __table_args__ = (UniqueConstraint('concepto', 'fecha_pago'), CheckConstraint('monto > 0'))
+    id: Mapped[int] = mapped_column(primary_key=True)
+    concepto: Mapped[str] = mapped_column(String(100))
+    categoria: Mapped[str] = mapped_column(String(40))
+    fecha_pago: Mapped[date] = mapped_column(Date)
+    monto: Mapped[Decimal] = mapped_column(Numeric(12, 2))

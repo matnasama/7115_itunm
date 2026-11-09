@@ -66,3 +66,11 @@ class Pago(Row):
     monto: Decimal
     medio_pago: str
     cuota: Cuota
+
+
+class Gasto(Row):
+    id: int
+    concepto: str
+    categoria: str
+    fecha_pago: date
+    monto: Decimal

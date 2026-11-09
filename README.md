@@ -8,7 +8,7 @@ PostgreSQL → FastAPI (Python, SQLAlchemy, Pydantic, psycopg, Uvicorn) → Reac
 
 ## Entidades y relaciones
 
-La base contiene exactamente siete tablas: `socios`, `categorias`, `profesores`, `actividades`, `inscripciones`, `cuotas` y `pagos`. Las PK son `id`. Las FK son `actividades.profesor_id`, `actividades.categoria_id`, `inscripciones.socio_id`, `inscripciones.actividad_id`, `cuotas.socio_id` y `pagos.cuota_id`.
+La base contiene ocho tablas: `socios`, `categorias`, `profesores`, `actividades`, `inscripciones`, `cuotas`, `pagos` y `gastos`. Las PK son `id`. Las FK son `actividades.profesor_id`, `actividades.categoria_id`, `inscripciones.socio_id`, `inscripciones.actividad_id`, `cuotas.socio_id` y `pagos.cuota_id`.
 
 - Profesor 1:N actividades; categoría 1:N actividades.
 - Socio N:M actividades mediante inscripciones.
@@ -39,7 +39,7 @@ El frontend usa `http://localhost:8002` por defecto. Para otra dirección, defin
 
 `GET /health`, `/socios`, `/actividades`, `/profesores`, `/categorias`, `/inscripciones`, `/cuotas`, `/pagos` y `/dashboard/resumen`, `/dashboard/socios-por-actividad`, `/dashboard/inscripciones-por-mes`, `/dashboard/recaudacion-mensual`, `/dashboard/estado-cuotas`, `/dashboard/medios-pago`.
 
-El Dashboard muestra cinco indicadores (socios activos, inscripciones activas, actividades, última recaudación y cuotas pendientes) y cinco gráficos: socios por actividad, inscripciones por mes, recaudación mensual, estado de cuotas y medios de pago. La última recaudación muestra el monto y mes de la última fila disponible del historial de pagos. Todas las cifras se consultan a la API y provienen de PostgreSQL. El estado de cuotas incluye porcentajes calculados a partir de los totales reales.
+El Dashboard muestra seis indicadores (socios activos, inscripciones activas, actividades, última recaudación, cuotas pendientes y saldo del último mes registrado) y seis gráficos: socios por actividad, inscripciones por mes, recaudación mensual, estado de cuotas, medios de pago y cuotas cobradas frente a gastos. La última recaudación muestra el monto y mes de la última fila disponible del historial de pagos. Todas las cifras se consultan a la API y provienen de PostgreSQL. El estado de cuotas incluye porcentajes calculados a partir de los totales reales.
 
 Las demás pantallas muestran tablas de socios, actividades, inscripciones, cuotas y pagos. La aplicación es de consulta; no incluye formularios de edición.
 
@@ -57,7 +57,7 @@ Si se modifica la API, actualizar también su equivalente en Netlify.
 1. Conservá tu `.env` local. `.env.example` tiene la conexión local activa y una
    alternativa Neon comentada: para probar FastAPI con Neon, dejá una sola
    `DATABASE_URL` activa y pegá ahí la connection string de Neon. Reiniciá la API.
-2. Verificá que Neon tenga las siete tablas y los datos. Si ya los cargaste, no
+2. Verificá que Neon tenga las ocho tablas y los datos. Si ya los cargaste, no
    vuelvas a ejecutar `database/database_setup.sql`: ese script elimina las tablas
    existentes antes de recrearlas. El despliegue no modifica ni carga la base.
 3. Subí estos cambios al repositorio y en Netlify importá ese repositorio. El archivo
@@ -82,3 +82,24 @@ no se conecta a PostgreSQL local. FastAPI admite ambas bases.
 
 El sitio y sus endpoints de consulta serán públicos: usá los datos ficticios de
 la demostración. No se necesita otro hosting para Python para esta modalidad.
+
+
+## Gastos y balance mensual
+
+La entidad `gastos` registra concepto, categoría, fecha de pago y monto. Se incluyen
+64 gastos ficticios (ocho conceptos por mes, de enero a agosto de 2026), por
+servicios, limpieza, seguro, mantenimiento y honorarios. Es independiente de las
+cuotas: representa egresos del club, sin una relación artificial con los socios.
+
+**Bases existentes (local y Neon):** ejecutar `database/agregar_gastos.sql` en
+pgAdmin o en el editor SQL de Neon antes de desplegar la nueva versión. No elimina
+datos y puede repetirse sin duplicar los gastos de ejemplo. No ejecutar de nuevo
+`database_setup.sql` sobre una base existente: ese archivo recrea las tablas.
+Para una instalación nueva, el setup completo ya incluye gastos.
+
+Las API local y Netlify incluyen `GET /gastos` y `GET /dashboard/balance-mensual`
+(con prefijo `/api` en Netlify). El dashboard compara cuotas efectivamente cobradas
+con gastos pagados, muestra el saldo del último mes con movimientos y explica si
+los cobros cubrieron los egresos. Se incluyen también meses con solo ingresos o
+solo gastos. Un saldo positivo indica excedente de caja sobre los gastos
+registrados; no equivale a una ganancia contable ni incluye obligaciones impagas.

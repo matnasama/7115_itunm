@@ -9,6 +9,11 @@ from database import get_db
 router = APIRouter()
 
 
+@router.get('/gastos', response_model=list[schemas.Gasto])
+def gastos(db: Session = Depends(get_db)):
+    return db.scalars(select(models.Gasto).order_by(models.Gasto.fecha_pago.desc(), models.Gasto.id)).all()
+
+
 @router.get('/socios', response_model=list[schemas.Socio])
 def socios(db: Session = Depends(get_db)):
     return db.scalars(select(models.Socio).order_by(models.Socio.id)).all()

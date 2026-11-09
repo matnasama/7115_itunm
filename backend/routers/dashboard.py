@@ -1,13 +1,21 @@
 from datetime import date
+from pathlib import Path
 
 from fastapi import APIRouter, Depends
-from sqlalchemy import func, select
+from sqlalchemy import func, select, text
 from sqlalchemy.orm import Session
 
 from database import get_db
 from models import Actividad, Cuota, Inscripcion, Pago, Profesor, Socio
 
 router = APIRouter(prefix='/dashboard')
+
+BALANCE_SQL = (Path(__file__).resolve().parent.parent / 'balance.sql').read_text(encoding='utf-8')
+
+
+@router.get('/balance-mensual')
+def balance_mensual(db: Session = Depends(get_db)):
+    return [dict(row) for row in db.execute(text(BALANCE_SQL)).mappings()]
 
 
 @router.get('/resumen')

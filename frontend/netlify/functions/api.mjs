@@ -6,6 +6,16 @@ const actividad = `SELECT a.*, row_to_json(p) AS profesor, row_to_json(c) AS cat
   JOIN categorias c ON c.id = a.categoria_id`
 const cuota = `SELECT c.*, row_to_json(s) AS socio FROM cuotas c JOIN socios s ON s.id = c.socio_id`
 export const queries = {
+  '/gastos': 'SELECT * FROM gastos ORDER BY fecha_pago DESC, id',
+  '/dashboard/balance-mensual': `WITH movimientos AS (
+    SELECT fecha_pago, monto AS ingresos, 0::numeric AS gastos FROM pagos
+    UNION ALL
+    SELECT fecha_pago, 0::numeric AS ingresos, monto AS gastos FROM gastos
+  )
+  SELECT to_char(fecha_pago, 'YYYY-MM') AS mes,
+    sum(ingresos)::float8 AS ingresos, sum(gastos)::float8 AS gastos,
+    (sum(ingresos) - sum(gastos))::float8 AS balance
+  FROM movimientos GROUP BY 1 ORDER BY 1`,
   '/socios': 'SELECT * FROM socios ORDER BY id',
   '/categorias': 'SELECT * FROM categorias ORDER BY id',
   '/profesores': 'SELECT * FROM profesores ORDER BY id',

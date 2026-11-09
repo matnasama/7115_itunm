@@ -18,6 +18,7 @@ type Inscripcion = { id: number; socio?: Person | null; actividad?: { nombre: st
 type Cuota = { id: number; socio?: Person | null; periodo: string; monto: number; estado: string }
 type Pago = { id: number; cuota_id: number; fecha_pago: string; medio_pago: string }
 type Resumen = { socios_activos: number; actividades: number; profesores: number; inscripciones_activas: number; cuotas_pendientes: number; recaudacion_total: number; recaudacion_mes_actual: number }
+type Balance = { mes: string; ingresos: number; gastos: number; balance: number }
 type ChartRow = Record<string, string | number>
 type Page = 'Dashboard' | 'Socios' | 'Actividades' | 'Inscripciones' | 'Cuotas y pagos'
 
@@ -41,31 +42,42 @@ function ChartCard({ title, children, footer }: { title: string; children: React
 }
 
 function Dashboard() {
-  const [data, setData] = useState<{ resumen: Resumen; socios: ChartRow[]; inscripciones: ChartRow[]; recaudacion: ChartRow[]; cuotas: ChartRow[]; medios: ChartRow[] } | null>(null)
+  const [data, setData] = useState<{ resumen: Resumen; socios: ChartRow[]; inscripciones: ChartRow[]; recaudacion: ChartRow[]; cuotas: ChartRow[]; medios: ChartRow[]; balance: Balance[] } | null>(null)
   const [error, setError] = useState('')
   useEffect(() => {
     let current = true
     Promise.all([
       get<Resumen>('/dashboard/resumen'), get<ChartRow[]>('/dashboard/socios-por-actividad'),
       get<ChartRow[]>('/dashboard/inscripciones-por-mes'), get<ChartRow[]>('/dashboard/recaudacion-mensual'),
-      get<ChartRow[]>('/dashboard/estado-cuotas'), get<ChartRow[]>('/dashboard/medios-pago')
-    ]).then(([resumen, socios, inscripciones, recaudacion, cuotas, medios]) => { if (current) setData({ resumen, socios, inscripciones, recaudacion, cuotas, medios }) }).catch(e => { if (current) setError(String(e)) })
+      get<ChartRow[]>('/dashboard/estado-cuotas'), get<ChartRow[]>('/dashboard/medios-pago'), get<Balance[]>('/dashboard/balance-mensual')
+    ]).then(([resumen, socios, inscripciones, recaudacion, cuotas, medios, balance]) => { if (current) setData({ resumen, socios, inscripciones, recaudacion, cuotas, medios, balance }) }).catch(e => { if (current) setError(String(e)) })
     return () => { current = false }
   }, [])
   if (error) return <p className="error">{error}. Revisá que FastAPI y PostgreSQL estén en ejecución.</p>
   if (!data) return <p>Cargando dashboard…</p>
+  const ultimoBalance = data.balance.at(-1)
   const latest = data.recaudacion.at(-1)
   const stats = [
     { label: 'Socios activos', value: number(data.resumen.socios_activos) },
     { label: 'Inscripciones activas', value: number(data.resumen.inscripciones_activas) },
     { label: 'Actividades', value: number(data.resumen.actividades) },
     { label: 'Última recaudación', value: latest ? money(Number(latest.recaudacion)) : 'Sin información', detail: latest ? month(String(latest.mes)) : undefined },
-    { label: 'Cuotas pendientes', value: number(data.resumen.cuotas_pendientes) }
+    { label: 'Cuotas pendientes', value: number(data.resumen.cuotas_pendientes) },
+    { label: 'Saldo del último mes registrado', value: ultimoBalance ? money(ultimoBalance.balance) : 'Sin información', detail: ultimoBalance ? month(ultimoBalance.mes) : undefined }
   ]
   const totalCuotas = data.cuotas.reduce((sum, row) => sum + Number(row.cantidad), 0)
   return <>
     <div className="stats">{stats.map(stat => <div className="stat" key={stat.label}><span>{stat.label}</span><strong>{stat.value}</strong>{stat.detail && <small>{stat.detail}</small>}</div>)}</div>
+    <section className="chart-card" aria-label="Balance del club">
+      <h3>¿Las cuotas cubren los gastos registrados?</h3>
+      {ultimoBalance ? <>
+        <p>En {month(ultimoBalance.mes)}, se cobraron <strong>{money(ultimoBalance.ingresos)}</strong> y se pagaron <strong>{money(ultimoBalance.gastos)}</strong> en gastos.</p>
+        <p>{ultimoBalance.balance > 0 ? `Las cuotas cubrieron los gastos registrados y dejaron un saldo a favor de ${money(ultimoBalance.balance)}.` : ultimoBalance.balance < 0 ? `Los gastos registrados superaron lo cobrado en ${money(-ultimoBalance.balance)}. Conviene revisar los costos y el cobro de cuotas.` : 'Las cuotas cubrieron exactamente los gastos registrados.'}</p>
+      </> : <p>No hay movimientos registrados para calcular el saldo.</p>}
+      <small>Comparación de cobros y gastos pagados del mismo mes. Incluye únicamente los movimientos registrados; no representa un resultado contable completo.</small>
+    </section>
     <div className="charts">
+      <ChartCard title="Cuotas cobradas y gastos por mes"><ResponsiveContainer width="100%" height="100%"><BarChart data={data.balance}><CartesianGrid strokeDasharray="3 3" stroke="#e9efed"/><XAxis dataKey="mes" tick={{ fontSize: 11 }}/><YAxis width={65} tickFormatter={v => `${number(Math.round(v / 1000))} mil`}/><Tooltip formatter={v => money(Number(v))}/><Legend/><Bar dataKey="ingresos" name="Cuotas cobradas" fill={colors[0]}/><Bar dataKey="gastos" name="Gastos pagados" fill={colors[3]}/></BarChart></ResponsiveContainer></ChartCard>
       <ChartCard title="Socios por actividad"><ResponsiveContainer width="100%" height="100%"><BarChart data={data.socios} margin={{ bottom: 48, right: 8 }}><CartesianGrid strokeDasharray="3 3" stroke="#e9efed"/><XAxis dataKey="actividad" angle={-28} textAnchor="end" height={78} interval={0} tick={{ fontSize: 11 }}/><YAxis allowDecimals={false} tick={{ fontSize: 11 }}/><Tooltip formatter={v => number(Number(v))}/><Bar dataKey="socios" fill={colors[0]} radius={[5,5,0,0]}/></BarChart></ResponsiveContainer></ChartCard>
       <ChartCard title="Inscripciones por mes"><ResponsiveContainer width="100%" height="100%"><LineChart data={data.inscripciones} margin={{ right: 10 }}><CartesianGrid strokeDasharray="3 3" stroke="#e9efed"/><XAxis dataKey="mes" minTickGap={25} tick={{ fontSize: 11 }}/><YAxis allowDecimals={false} tick={{ fontSize: 11 }}/><Tooltip formatter={v => number(Number(v))}/><Line type="monotone" dataKey="inscripciones" stroke={colors[2]} strokeWidth={3} dot={false} activeDot={{ r: 5 }}/></LineChart></ResponsiveContainer></ChartCard>
       <ChartCard title="Recaudación mensual"><ResponsiveContainer width="100%" height="100%"><LineChart data={data.recaudacion} margin={{ right: 10 }}><CartesianGrid strokeDasharray="3 3" stroke="#e9efed"/><XAxis dataKey="mes" minTickGap={15} tick={{ fontSize: 11 }}/><YAxis width={58} tickFormatter={v => `${number(Math.round(v / 1000))} mil`} tick={{ fontSize: 11 }}/><Tooltip formatter={v => money(Number(v))}/><Line type="monotone" dataKey="recaudacion" stroke={colors[0]} strokeWidth={3} dot={false} activeDot={{ r: 5 }}/></LineChart></ResponsiveContainer></ChartCard>
