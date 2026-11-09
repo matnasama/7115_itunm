@@ -21,7 +21,7 @@ type Resumen = { socios_activos: number; actividades: number; profesores: number
 type Balance = { mes: string; ingresos: number; gastos: number; balance: number }
 type Gasto = { id: number; concepto: string; categoria: string; fecha_pago: string; monto: number | string }
 type ChartRow = Record<string, string | number>
-type Page = 'Dashboard' | 'Socios' | 'Actividades' | 'Inscripciones' | 'Cuotas y pagos'
+type Page = 'Dashboard' | 'Socios' | 'Actividades' | 'Inscripciones' | 'Cuotas y pagos' | 'Gastos'
 
 async function get<T>(path: string): Promise<T> {
   const response = await fetch(`${API}${path}`)
@@ -43,31 +43,27 @@ function ChartCard({ title, children, footer }: { title: string; children: React
 }
 
 function Dashboard() {
-  const [data, setData] = useState<{ resumen: Resumen; socios: ChartRow[]; inscripciones: ChartRow[]; recaudacion: ChartRow[]; cuotas: ChartRow[]; medios: ChartRow[]; balance: Balance[]; gastos: Gasto[] } | null>(null)
+  const [data, setData] = useState<{ resumen: Resumen; socios: ChartRow[]; inscripciones: ChartRow[]; recaudacion: ChartRow[]; cuotas: ChartRow[]; medios: ChartRow[]; balance: Balance[] } | null>(null)
   const [error, setError] = useState('')
-  const [mesGastos, setMesGastos] = useState('')
   useEffect(() => {
     let current = true
     Promise.all([
       get<Resumen>('/dashboard/resumen'), get<ChartRow[]>('/dashboard/socios-por-actividad'),
       get<ChartRow[]>('/dashboard/inscripciones-por-mes'), get<ChartRow[]>('/dashboard/recaudacion-mensual'),
-      get<ChartRow[]>('/dashboard/estado-cuotas'), get<ChartRow[]>('/dashboard/medios-pago'), get<Balance[]>('/dashboard/balance-mensual'), get<Gasto[]>('/gastos')
-    ]).then(([resumen, socios, inscripciones, recaudacion, cuotas, medios, balance, gastos]) => { if (current) setData({ resumen, socios, inscripciones, recaudacion, cuotas, medios, balance, gastos }) }).catch(e => { if (current) setError(String(e)) })
+      get<ChartRow[]>('/dashboard/estado-cuotas'), get<ChartRow[]>('/dashboard/medios-pago'), get<Balance[]>('/dashboard/balance-mensual')
+    ]).then(([resumen, socios, inscripciones, recaudacion, cuotas, medios, balance]) => { if (current) setData({ resumen, socios, inscripciones, recaudacion, cuotas, medios, balance }) }).catch(e => { if (current) setError(String(e)) })
     return () => { current = false }
   }, [])
   if (error) return <p className="error">{error}. Revisá que FastAPI y PostgreSQL estén en ejecución.</p>
   if (!data) return <p>Cargando dashboard…</p>
   const ultimoBalance = data.balance.at(-1)
-  const periodoGastos = mesGastos || ultimoBalance?.mes || ''
-  const gastosDelMes = data.gastos.filter(gasto => gasto.fecha_pago.slice(0, 7) === periodoGastos)
-  const totalGastos = gastosDelMes.reduce((total, gasto) => total + Number(gasto.monto), 0)
   const latest = data.recaudacion.at(-1)
   const stats = [
     { label: 'Socios activos', value: number(data.resumen.socios_activos) },
     { label: 'Inscripciones activas', value: number(data.resumen.inscripciones_activas) },
     { label: 'Actividades', value: number(data.resumen.actividades) },
-    { label: 'Última recaudación', value: latest ? money(Number(latest.recaudacion)) : 'Sin información', detail: latest ? month(String(latest.mes)) : undefined },
     { label: 'Cuotas pendientes', value: number(data.resumen.cuotas_pendientes) },
+    { label: 'Última recaudación', value: latest ? money(Number(latest.recaudacion)) : 'Sin información', detail: latest ? month(String(latest.mes)) : undefined },
     { label: 'Gastos del último mes registrado', value: ultimoBalance ? money(ultimoBalance.gastos) : 'Sin información', detail: ultimoBalance ? month(ultimoBalance.mes) : undefined },
     { label: 'Saldo del último mes registrado', value: ultimoBalance ? money(ultimoBalance.balance) : 'Sin información', detail: ultimoBalance ? month(ultimoBalance.mes) : undefined }
   ]
@@ -82,21 +78,41 @@ function Dashboard() {
       <ChartCard title="Estado de cuotas" footer={<div className="chart-summary">{data.cuotas.map(row => <div key={String(row.estado)}><span className="summary-dot" style={{ background: row.estado === 'pagada' ? colors[0] : colors[1] }}/><span>{row.estado === 'pagada' ? 'Pagadas' : 'Pendientes'}</span><strong>{number(Number(row.cantidad))} · {new Intl.NumberFormat('es-AR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(totalCuotas ? Number(row.cantidad) / totalCuotas * 100 : 0)} %</strong></div>)}</div>}><ResponsiveContainer width="100%" height="100%"><PieChart><Pie data={data.cuotas} dataKey="cantidad" nameKey="estado" cx="50%" cy="50%" innerRadius={48} outerRadius={90}>{data.cuotas.map((row, i) => <Cell key={i} fill={row.estado === 'pagada' ? colors[0] : colors[1]}/>)}</Pie><Tooltip formatter={v => number(Number(v))}/></PieChart></ResponsiveContainer></ChartCard>
       <ChartCard title="Medios de pago"><ResponsiveContainer width="100%" height="100%"><PieChart><Pie data={data.medios} dataKey="cantidad" nameKey="medio_pago" cx="50%" cy="50%" outerRadius={90} label>{data.medios.map((_, i) => <Cell key={i} fill={colors[i % colors.length]}/>)}</Pie><Tooltip formatter={v => number(Number(v))}/><Legend/></PieChart></ResponsiveContainer></ChartCard>
     </div>
-    <section className="chart-card expense-detail" aria-label="Detalle de gastos">
+  </>
+}
+
+function Gastos() {
+  const [gastos, setGastos] = useState<Gasto[] | null>(null)
+  const [error, setError] = useState('')
+  const [mesGastos, setMesGastos] = useState('')
+  useEffect(() => {
+    let current = true
+    get<Gasto[]>('/gastos').then(rows => { if (current) setGastos(rows) })
+      .catch(e => { if (current) setError(String(e)) })
+    return () => { current = false }
+  }, [])
+  if (error) return <p className="error">{error}</p>
+  if (!gastos) return <p className="status">Cargando gastos...</p>
+  const periodos = [...new Set(gastos.map(gasto => gasto.fecha_pago.slice(0, 7)))].sort().reverse()
+  const periodoGastos = mesGastos || periodos[0] || ''
+  const gastosDelMes = gastos.filter(gasto => gasto.fecha_pago.slice(0, 7) === periodoGastos)
+  const totalGastos = gastosDelMes.reduce((total, gasto) => total + Number(gasto.monto), 0)
+  return (
+    <section className="chart-card" aria-label="Detalle de gastos">
       <h3>Detalle de gastos</h3>
       <div className="filters">
-        <label><span>Mes de los gastos</span><select value={periodoGastos} onChange={e => setMesGastos(e.target.value)} disabled={!data.balance.length}>
-          {!data.balance.length && <option value="">Sin movimientos</option>}
-          {[...data.balance].reverse().map(row => <option key={row.mes} value={row.mes}>{month(row.mes)}</option>)}
+        <label><span>Mes de los gastos</span><select value={periodoGastos} onChange={e => setMesGastos(e.target.value)} disabled={!periodos.length}>
+          {!periodos.length && <option value="">Sin movimientos</option>}
+          {periodos.map(mes => <option key={mes} value={mes}>{month(mes)}</option>)}
         </select></label>
         <div>Total del mes: <strong>{money(totalGastos)}</strong></div>
       </div>
       <Table headers={['Concepto', 'Categoría', 'Fecha de pago', 'Importe']} rows={gastosDelMes.map(gasto => [gasto.concepto, gasto.categoria, date(gasto.fecha_pago), money(Number(gasto.monto))])}/>
     </section>
-  </>
+  )
 }
 
-function Listing({ page }: { page: Exclude<Page, 'Dashboard'> }) {
+function Listing({ page }: { page: Exclude<Page, 'Dashboard' | 'Gastos'> }) {
   const [rows, setRows] = useState<unknown[] | null>(null)
   const [payments, setPayments] = useState<Pago[]>([])
   const [error, setError] = useState('')
@@ -144,6 +160,6 @@ function Listing({ page }: { page: Exclude<Page, 'Dashboard'> }) {
 
 export default function App() {
   const [page, setPage] = useState<Page>('Dashboard')
-  const pages: Page[] = ['Dashboard', 'Socios', 'Actividades', 'Inscripciones', 'Cuotas y pagos']
-  return <div className="layout"><aside><div className="brand"><span className="brand-mark">CM</span><div><strong>Club Atlético Moreno</strong><small>ITUNM · Gestión de Proyectos</small></div></div><nav>{pages.map(p => <button key={p} className={page === p ? 'selected' : ''} onClick={() => setPage(p)}>{p}</button>)}</nav><p className="side-note">PostgreSQL → FastAPI → React</p></aside><main><header><div><span className="eyebrow">PANEL ADMINISTRATIVO</span><h1>{page}</h1></div><span className="header-tag">Club Moreno ITUNM</span></header><div className="content">{page === 'Dashboard' ? <Dashboard/> : <Listing key={page} page={page}/>}</div></main></div>
+  const pages: Page[] = ['Dashboard', 'Socios', 'Actividades', 'Inscripciones', 'Cuotas y pagos', 'Gastos']
+  return <div className="layout"><aside><div className="brand"><span className="brand-mark">CM</span><div><strong>Club Atlético Moreno</strong><small>ITUNM · Gestión de Proyectos</small></div></div><nav>{pages.map(p => <button key={p} className={page === p ? 'selected' : ''} onClick={() => setPage(p)}>{p}</button>)}</nav><p className="side-note">PostgreSQL → FastAPI → React</p></aside><main><header><div><span className="eyebrow">PANEL ADMINISTRATIVO</span><h1>{page}</h1></div><span className="header-tag">Club Moreno ITUNM</span></header><div className="content">{page === 'Dashboard' ? <Dashboard/> : page === 'Gastos' ? <Gastos/> : <Listing key={page} page={page}/>}</div></main></div>
 }

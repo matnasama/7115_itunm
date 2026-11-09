@@ -100,7 +100,7 @@ Para una instalación nueva, el setup completo ya incluye gastos.
 Las API local y Netlify incluyen `GET /gastos` y `GET /dashboard/balance-mensual`
 (con prefijo `/api` en Netlify). El dashboard compara cuotas efectivamente cobradas
 con gastos pagados y muestra por separado gastos y saldo del último mes con
-movimientos. Incluye un detalle de gastos por mes (concepto, categoría, fecha e
+movimientos. La sección Gastos del menú lateral incluye el detalle por mes (concepto, categoría, fecha e
 importe), sin conclusiones interpretativas en pantalla. Se incluyen también meses con solo ingresos o
 solo gastos. Un saldo positivo indica excedente de caja sobre los gastos
 registrados; no equivale a una ganancia contable ni incluye obligaciones impagas.
