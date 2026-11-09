@@ -39,7 +39,7 @@ El frontend usa `http://localhost:8002` por defecto. Para otra dirección, defin
 
 `GET /health`, `/socios`, `/actividades`, `/profesores`, `/categorias`, `/inscripciones`, `/cuotas`, `/pagos` y `/dashboard/resumen`, `/dashboard/socios-por-actividad`, `/dashboard/inscripciones-por-mes`, `/dashboard/recaudacion-mensual`, `/dashboard/estado-cuotas`, `/dashboard/medios-pago`.
 
-El Dashboard muestra seis indicadores (socios activos, inscripciones activas, actividades, última recaudación, cuotas pendientes y saldo del último mes registrado) y seis gráficos: socios por actividad, inscripciones por mes, recaudación mensual, estado de cuotas, medios de pago y cuotas cobradas frente a gastos. La última recaudación muestra el monto y mes de la última fila disponible del historial de pagos. Todas las cifras se consultan a la API y provienen de PostgreSQL. El estado de cuotas incluye porcentajes calculados a partir de los totales reales.
+El Dashboard muestra siete indicadores (socios activos, inscripciones activas, actividades, última recaudación, cuotas pendientes, gastos y saldo del último mes registrado) y seis gráficos: socios por actividad, inscripciones por mes, recaudación mensual, estado de cuotas, medios de pago y cuotas cobradas frente a gastos. La última recaudación muestra el monto y mes de la última fila disponible del historial de pagos. Todas las cifras se consultan a la API y provienen de PostgreSQL. El estado de cuotas incluye porcentajes calculados a partir de los totales reales.
 
 Las demás pantallas muestran tablas de socios, actividades, inscripciones, cuotas y pagos. La aplicación es de consulta; no incluye formularios de edición.
 
@@ -99,7 +99,8 @@ Para una instalación nueva, el setup completo ya incluye gastos.
 
 Las API local y Netlify incluyen `GET /gastos` y `GET /dashboard/balance-mensual`
 (con prefijo `/api` en Netlify). El dashboard compara cuotas efectivamente cobradas
-con gastos pagados, muestra el saldo del último mes con movimientos y explica si
-los cobros cubrieron los egresos. Se incluyen también meses con solo ingresos o
+con gastos pagados y muestra por separado gastos y saldo del último mes con
+movimientos. Incluye un detalle de gastos por mes (concepto, categoría, fecha e
+importe), sin conclusiones interpretativas en pantalla. Se incluyen también meses con solo ingresos o
 solo gastos. Un saldo positivo indica excedente de caja sobre los gastos
 registrados; no equivale a una ganancia contable ni incluye obligaciones impagas.

@@ -19,6 +19,7 @@ type Cuota = { id: number; socio?: Person | null; periodo: string; monto: number
 type Pago = { id: number; cuota_id: number; fecha_pago: string; medio_pago: string }
 type Resumen = { socios_activos: number; actividades: number; profesores: number; inscripciones_activas: number; cuotas_pendientes: number; recaudacion_total: number; recaudacion_mes_actual: number }
 type Balance = { mes: string; ingresos: number; gastos: number; balance: number }
+type Gasto = { id: number; concepto: string; categoria: string; fecha_pago: string; monto: number | string }
 type ChartRow = Record<string, string | number>
 type Page = 'Dashboard' | 'Socios' | 'Actividades' | 'Inscripciones' | 'Cuotas y pagos'
 
@@ -42,20 +43,24 @@ function ChartCard({ title, children, footer }: { title: string; children: React
 }
 
 function Dashboard() {
-  const [data, setData] = useState<{ resumen: Resumen; socios: ChartRow[]; inscripciones: ChartRow[]; recaudacion: ChartRow[]; cuotas: ChartRow[]; medios: ChartRow[]; balance: Balance[] } | null>(null)
+  const [data, setData] = useState<{ resumen: Resumen; socios: ChartRow[]; inscripciones: ChartRow[]; recaudacion: ChartRow[]; cuotas: ChartRow[]; medios: ChartRow[]; balance: Balance[]; gastos: Gasto[] } | null>(null)
   const [error, setError] = useState('')
+  const [mesGastos, setMesGastos] = useState('')
   useEffect(() => {
     let current = true
     Promise.all([
       get<Resumen>('/dashboard/resumen'), get<ChartRow[]>('/dashboard/socios-por-actividad'),
       get<ChartRow[]>('/dashboard/inscripciones-por-mes'), get<ChartRow[]>('/dashboard/recaudacion-mensual'),
-      get<ChartRow[]>('/dashboard/estado-cuotas'), get<ChartRow[]>('/dashboard/medios-pago'), get<Balance[]>('/dashboard/balance-mensual')
-    ]).then(([resumen, socios, inscripciones, recaudacion, cuotas, medios, balance]) => { if (current) setData({ resumen, socios, inscripciones, recaudacion, cuotas, medios, balance }) }).catch(e => { if (current) setError(String(e)) })
+      get<ChartRow[]>('/dashboard/estado-cuotas'), get<ChartRow[]>('/dashboard/medios-pago'), get<Balance[]>('/dashboard/balance-mensual'), get<Gasto[]>('/gastos')
+    ]).then(([resumen, socios, inscripciones, recaudacion, cuotas, medios, balance, gastos]) => { if (current) setData({ resumen, socios, inscripciones, recaudacion, cuotas, medios, balance, gastos }) }).catch(e => { if (current) setError(String(e)) })
     return () => { current = false }
   }, [])
   if (error) return <p className="error">{error}. Revisá que FastAPI y PostgreSQL estén en ejecución.</p>
   if (!data) return <p>Cargando dashboard…</p>
   const ultimoBalance = data.balance.at(-1)
+  const periodoGastos = mesGastos || ultimoBalance?.mes || ''
+  const gastosDelMes = data.gastos.filter(gasto => gasto.fecha_pago.slice(0, 7) === periodoGastos)
+  const totalGastos = gastosDelMes.reduce((total, gasto) => total + Number(gasto.monto), 0)
   const latest = data.recaudacion.at(-1)
   const stats = [
     { label: 'Socios activos', value: number(data.resumen.socios_activos) },
@@ -63,19 +68,12 @@ function Dashboard() {
     { label: 'Actividades', value: number(data.resumen.actividades) },
     { label: 'Última recaudación', value: latest ? money(Number(latest.recaudacion)) : 'Sin información', detail: latest ? month(String(latest.mes)) : undefined },
     { label: 'Cuotas pendientes', value: number(data.resumen.cuotas_pendientes) },
+    { label: 'Gastos del último mes registrado', value: ultimoBalance ? money(ultimoBalance.gastos) : 'Sin información', detail: ultimoBalance ? month(ultimoBalance.mes) : undefined },
     { label: 'Saldo del último mes registrado', value: ultimoBalance ? money(ultimoBalance.balance) : 'Sin información', detail: ultimoBalance ? month(ultimoBalance.mes) : undefined }
   ]
   const totalCuotas = data.cuotas.reduce((sum, row) => sum + Number(row.cantidad), 0)
   return <>
     <div className="stats">{stats.map(stat => <div className="stat" key={stat.label}><span>{stat.label}</span><strong>{stat.value}</strong>{stat.detail && <small>{stat.detail}</small>}</div>)}</div>
-    <section className="chart-card" aria-label="Balance del club">
-      <h3>¿Las cuotas cubren los gastos registrados?</h3>
-      {ultimoBalance ? <>
-        <p>En {month(ultimoBalance.mes)}, se cobraron <strong>{money(ultimoBalance.ingresos)}</strong> y se pagaron <strong>{money(ultimoBalance.gastos)}</strong> en gastos.</p>
-        <p>{ultimoBalance.balance > 0 ? `Las cuotas cubrieron los gastos registrados y dejaron un saldo a favor de ${money(ultimoBalance.balance)}.` : ultimoBalance.balance < 0 ? `Los gastos registrados superaron lo cobrado en ${money(-ultimoBalance.balance)}. Conviene revisar los costos y el cobro de cuotas.` : 'Las cuotas cubrieron exactamente los gastos registrados.'}</p>
-      </> : <p>No hay movimientos registrados para calcular el saldo.</p>}
-      <small>Comparación de cobros y gastos pagados del mismo mes. Incluye únicamente los movimientos registrados; no representa un resultado contable completo.</small>
-    </section>
     <div className="charts">
       <ChartCard title="Cuotas cobradas y gastos por mes"><ResponsiveContainer width="100%" height="100%"><BarChart data={data.balance}><CartesianGrid strokeDasharray="3 3" stroke="#e9efed"/><XAxis dataKey="mes" tick={{ fontSize: 11 }}/><YAxis width={65} tickFormatter={v => `${number(Math.round(v / 1000))} mil`}/><Tooltip formatter={v => money(Number(v))}/><Legend/><Bar dataKey="ingresos" name="Cuotas cobradas" fill={colors[0]}/><Bar dataKey="gastos" name="Gastos pagados" fill={colors[3]}/></BarChart></ResponsiveContainer></ChartCard>
       <ChartCard title="Socios por actividad"><ResponsiveContainer width="100%" height="100%"><BarChart data={data.socios} margin={{ bottom: 48, right: 8 }}><CartesianGrid strokeDasharray="3 3" stroke="#e9efed"/><XAxis dataKey="actividad" angle={-28} textAnchor="end" height={78} interval={0} tick={{ fontSize: 11 }}/><YAxis allowDecimals={false} tick={{ fontSize: 11 }}/><Tooltip formatter={v => number(Number(v))}/><Bar dataKey="socios" fill={colors[0]} radius={[5,5,0,0]}/></BarChart></ResponsiveContainer></ChartCard>
@@ -84,6 +82,17 @@ function Dashboard() {
       <ChartCard title="Estado de cuotas" footer={<div className="chart-summary">{data.cuotas.map(row => <div key={String(row.estado)}><span className="summary-dot" style={{ background: row.estado === 'pagada' ? colors[0] : colors[1] }}/><span>{row.estado === 'pagada' ? 'Pagadas' : 'Pendientes'}</span><strong>{number(Number(row.cantidad))} · {new Intl.NumberFormat('es-AR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(totalCuotas ? Number(row.cantidad) / totalCuotas * 100 : 0)} %</strong></div>)}</div>}><ResponsiveContainer width="100%" height="100%"><PieChart><Pie data={data.cuotas} dataKey="cantidad" nameKey="estado" cx="50%" cy="50%" innerRadius={48} outerRadius={90}>{data.cuotas.map((row, i) => <Cell key={i} fill={row.estado === 'pagada' ? colors[0] : colors[1]}/>)}</Pie><Tooltip formatter={v => number(Number(v))}/></PieChart></ResponsiveContainer></ChartCard>
       <ChartCard title="Medios de pago"><ResponsiveContainer width="100%" height="100%"><PieChart><Pie data={data.medios} dataKey="cantidad" nameKey="medio_pago" cx="50%" cy="50%" outerRadius={90} label>{data.medios.map((_, i) => <Cell key={i} fill={colors[i % colors.length]}/>)}</Pie><Tooltip formatter={v => number(Number(v))}/><Legend/></PieChart></ResponsiveContainer></ChartCard>
     </div>
+    <section className="chart-card expense-detail" aria-label="Detalle de gastos">
+      <h3>Detalle de gastos</h3>
+      <div className="filters">
+        <label><span>Mes de los gastos</span><select value={periodoGastos} onChange={e => setMesGastos(e.target.value)} disabled={!data.balance.length}>
+          {!data.balance.length && <option value="">Sin movimientos</option>}
+          {[...data.balance].reverse().map(row => <option key={row.mes} value={row.mes}>{month(row.mes)}</option>)}
+        </select></label>
+        <div>Total del mes: <strong>{money(totalGastos)}</strong></div>
+      </div>
+      <Table headers={['Concepto', 'Categoría', 'Fecha de pago', 'Importe']} rows={gastosDelMes.map(gasto => [gasto.concepto, gasto.categoria, date(gasto.fecha_pago), money(Number(gasto.monto))])}/>
+    </section>
   </>
 }
 
